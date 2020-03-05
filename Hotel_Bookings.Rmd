@@ -1,0 +1,403 @@
+---
+title: "EDA HotelBookings"
+output: 
+  flexdashboard::flex_dashboard:
+    theme: yeti
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+```
+
+
+```{r, echo=FALSE}
+library(readr)
+dt <- read_csv("Datasets/hotel_bookings.csv")
+
+```
+
+Case Description  
+=====================================    
+
+### Description of the dataset
+
+This dataset used for this   example was obtain from [Kaggle](https://www.kaggle.com/jessemostipak/hotel-booking-demand). 
+
+Case:
+
+The Hotel manager wants to launch an advertisement campaign for the **City Hotel**. But to make sure he gets the best results, we were asked to analyse this dataset and answer the following questions:
+
+--What kind of client is the hotel's best client? Groups, families couples?  
+--Which is his best channel ? direct, travel agency or travel operators, etc  
+--Where are the clients coming from?  
+--Occupancy throughout the year in the hotel  
+
+
+Data Visualizations {data-orientation=rows}
+=====================================  
+
+Row
+-------------------------------------
+
+```{r Preparation}
+library(plotly)
+library(leaflet)
+library(dygraphs)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(purrr)
+
+#===============
+#  Assumptions
+#===============
+
+#  As this is a fictitional dataset and is the only information we've got. We are going to assume the lodging transactions is the overall spent by the reservation including accomodation and  additionals purchases at the hotel
+
+#==============
+# New variables 
+#==============
+
+        dt <- dt%>%
+        mutate(total_days = stays_in_week_nights + stays_in_weekend_nights,
+               Revenue = adr * total_days, # Total Revenue per reservation
+               Customers = adults+children+babies) # Total number of customer per reservation
+
+
+
+#=================
+# Odd Observations
+#=================
+
+# Check for odd observartions:
+
+   Odd.observations <- dt%>%
+        filter(is_canceled==0,
+               adr <=0) # Reservations that do not appear as canceled but did not generate revenue, (which is impossible)
+
+   Odd.observations.2 <-  dt%>%
+           filter( is_canceled ==0,#Reservation not cancelled
+               adr > 0, # Revenue generated
+              total_days == 0) # But the person did not stay 
+
+#==============
+# Initial Cut
+#==============
+
+        dt <- dt%>%
+               filter(adr > 0 ,# Only reservations that generated revenue
+               total_days > 0, #If they didn't stay they should not be in the list.
+               hotel=="City Hotel") # The analysis is only for the city hotel
+        
+```
+
+### Who are our best clients?
+
+```{r icon paths}
+i.individual <- paste0("path://", "M50.5,6.33333333 C60.9588924,6.33333333 69.4375,14.8399231 69.4375,25.3333333 C69.4375,35.8267436 60.9588924,44.3333333 50.5,44.3333333 C40.0411076,44.3333333 31.5625,35.8267436 31.5625,25.3333333 C31.574293,14.844828 40.0459963,6.3451653 50.5,6.33333333 M50.5,0 C36.5548101,0 25.25,11.3421197 25.25,25.3333333 C25.25,39.324547 36.5548101,50.6666667 50.5,50.6666667 C64.4451899,50.6666667 75.75,39.324547 75.75,25.3333333 C75.75,11.3421197 64.4451899,0 50.5,0 L50.5,0 Z M82.0625,69.6666667 C89.0318358,69.6745546 94.679638,75.3409964 94.6875,82.3333333 C94.683569,85.8295018 91.8596679,88.6627227 88.375,88.6666667 L12.625,88.6666667 C9.1403321,88.6627227 6.31643102,85.8295018 6.3125,82.3333333 C6.32036203,75.3409964 11.9681642,69.6745546 18.9375,69.6666667 L82.0625,69.6666667 M82.0625,63.3333333 L18.9375,63.3333333 C8.47860755,63.3333333 0,71.8399231 0,82.3333333 C0,89.3289402 5.65240503,95 12.625,95 L88.375,95 C95.347595,95 101,89.3289402 101,82.3333333 C101,71.8399231 92.5213924,63.3333333 82.0625,63.3333333 L82.0625,63.3333333 Z")
+
+i.couple<- paste0("path://", "M117.086445,51.1538462 C131.232466,51.1538462 142.700081,39.7026676 142.700081,25.5769231 C142.700081,11.4511785 131.232466,0 117.086445,0 C102.940424,0 91.4728086,11.4511785 91.4728086,25.5769231 C91.4728086,39.7026676 102.940424,51.1538462 117.086445,51.1538462 L117.086445,51.1538462 Z M117.086445,7.30769231 C127.190746,7.30769231 135.3819,15.4871055 135.3819,25.5769231 C135.3819,35.6667406 127.190746,43.8461538 117.086445,43.8461538 C106.982144,43.8461538 98.7909905,35.6667406 98.7909905,25.5769231 C98.8023636,15.4918134 106.986859,7.31904911 117.086445,7.30769231 L117.086445,7.30769231 Z M139.045455,58.4615385 L95.1363636,58.4615385 C89.7189484,58.4753332 84.5009255,60.5036936 80.5,64.1510154 C76.4990745,60.5036936 71.2810516,58.4753332 65.8636364,58.4615385 L21.9545455,58.4615385 C9.82938481,58.4615385 0,68.2768343 0,80.3846154 C0,88.4564694 6.55292321,95 14.6363636,95 L73.1818182,95 C75.7583402,94.9861907 78.2845514,94.2864241 80.5,92.9728462 C82.7154486,94.2864241 85.2416598,94.9861907 87.8181818,95 L146.363636,95 C154.447077,95 161,88.4564694 161,80.3846154 C161,68.2768343 151.170615,58.4615385 139.045455,58.4615385 Z M73.1818182,87.6923077 L14.6363636,87.6923077 C10.596566,87.6876766 7.32281959,84.4186226 7.31818182,80.3846154 C7.3272964,72.3165343 13.8748834,65.7783323 21.9545455,65.7692308 L65.8636364,65.7692308 C73.9432984,65.7783323 80.4908854,72.3165343 80.5,80.3846154 C80.4953622,84.4186226 77.2216158,87.6876766 73.1818182,87.6923077 L73.1818182,87.6923077 Z M146.363636,87.6923077 L87.8181818,87.6923077 C87.194744,87.6506846 86.5796343,87.5263351 85.9890755,87.3225385 C87.1730408,85.2001666 87.8021241,82.8140111 87.8181818,80.3846154 C87.7943025,76.6988624 86.829813,73.0800367 85.0158305,69.8700154 C87.7286921,67.2435711 91.3577884,65.7730811 95.1363636,65.7692308 L139.045455,65.7692308 C147.125117,65.7783323 153.672704,72.3165343 153.681818,80.3846154 C153.67718,84.4186226 150.403434,87.6876766 146.363636,87.6923077 Z M43.90953,51.1538462 C58.0555508,51.1538462 69.5231664,39.7026676 69.5231664,25.5769231 C69.5231664,11.4511785 58.0555508,0 43.90953,0 C29.7635092,0 18.2958936,11.4511785 18.2958936,25.5769231 C18.2958936,39.7026676 29.7635092,51.1538462 43.90953,51.1538462 L43.90953,51.1538462 Z M43.90953,7.30769231 C54.0138305,7.30769231 62.2049845,15.4871055 62.2049845,25.5769231 C62.2049845,35.6667406 54.0138305,43.8461538 43.90953,43.8461538 C33.8052295,43.8461538 25.6140755,35.6667406 25.6140755,25.5769231 C25.6254486,15.4918134 33.8099441,7.31904911 43.90953,7.30769231 L43.90953,7.30769231 Z" )
+
+i.group  <- paste0("path://","M117.086445,51.1538462 C131.232466,51.1538462 142.700081,39.7026676 142.700081,25.5769231 C142.700081,11.4511785 131.232466,0 117.086445,0 C102.940424,0 91.4728086,11.4511785 91.4728086,25.5769231 C91.4728086,39.7026676 102.940424,51.1538462 117.086445,51.1538462 L117.086445,51.1538462 Z M117.086445,7.30769231 C127.190746,7.30769231 135.3819,15.4871055 135.3819,25.5769231 C135.3819,35.6667406 127.190746,43.8461538 117.086445,43.8461538 C106.982144,43.8461538 98.7909905,35.6667406 98.7909905,25.5769231 C98.8023636,15.4918134 106.986859,7.31904911 117.086445,7.30769231 L117.086445,7.30769231 Z M139.045455,58.4615385 L95.1363636,58.4615385 C89.7189484,58.4753332 84.5009255,60.5036936 80.5,64.1510154 C76.4990745,60.5036936 71.2810516,58.4753332 65.8636364,58.4615385 L21.9545455,58.4615385 C9.82938481,58.4615385 0,68.2768343 0,80.3846154 C0,88.4564694 6.55292321,95 14.6363636,95 L73.1818182,95 C75.7583402,94.9861907 78.2845514,94.2864241 80.5,92.9728462 C82.7154486,94.2864241 85.2416598,94.9861907 87.8181818,95 L146.363636,95 C154.447077,95 161,88.4564694 161,80.3846154 C161,68.2768343 151.170615,58.4615385 139.045455,58.4615385 Z M73.1818182,87.6923077 L14.6363636,87.6923077 C10.596566,87.6876766 7.32281959,84.4186226 7.31818182,80.3846154 C7.3272964,72.3165343 13.8748834,65.7783323 21.9545455,65.7692308 L65.8636364,65.7692308 C73.9432984,65.7783323 80.4908854,72.3165343 80.5,80.3846154 C80.4953622,84.4186226 77.2216158,87.6876766 73.1818182,87.6923077 L73.1818182,87.6923077 Z M146.363636,87.6923077 L87.8181818,87.6923077 C87.194744,87.6506846 86.5796343,87.5263351 85.9890755,87.3225385 C87.1730408,85.2001666 87.8021241,82.8140111 87.8181818,80.3846154 C87.7943025,76.6988624 86.829813,73.0800367 85.0158305,69.8700154 C87.7286921,67.2435711 91.3577884,65.7730811 95.1363636,65.7692308 L139.045455,65.7692308 C147.125117,65.7783323 153.672704,72.3165343 153.681818,80.3846154 C153.67718,84.4186226 150.403434,87.6876766 146.363636,87.6923077 Z M43.90953,51.1538462 C58.0555508,51.1538462 69.5231664,39.7026676 69.5231664,25.5769231 C69.5231664,11.4511785 58.0555508,0 43.90953,0 C29.7635092,0 18.2958936,11.4511785 18.2958936,25.5769231 C18.2958936,39.7026676 29.7635092,51.1538462 43.90953,51.1538462 L43.90953,51.1538462 Z M179,6 C180.718219,6 182.111111,7.41776496 182.111111,9.16666667 L182.111111,31.3333333 L203.888888,31.3333333 C204.714153,31.3328457 205.505755,31.6663191 206.089305,32.26029 C206.672856,32.854261 207,33.6599984 207,34.5 C207,35.3400016 206.672856,36.145739 206.089305,36.73971 C205.505755,37.3336809 204.714153,37.6671543 203.888888,37.6666667 L182.111111,37.6666667 L182.111111,59.8333333 C182.111111,61.582235 180.718219,63 179,63 C177.281781,63 175.888889,61.582235 175.888889,59.8333333 L175.888889,37.6666667 L154.111111,37.6666667 C152.392892,37.6666667 151,36.2489017 151,34.5 C151,32.7510983 152.392892,31.3333333 154.111111,31.3333333 L175.888889,31.3333333 L175.888889,9.16666667 C175.888889,7.41776496 177.281781,6 179,6 Z M43.90953,7.30769231 C54.0138305,7.30769231 62.2049845,15.4871055 62.2049845,25.5769231 C62.2049845,35.6667406 54.0138305,43.8461538 43.90953,43.8461538 C33.8052295,43.8461538 25.6140755,35.6667406 25.6140755,25.5769231 C25.6254486,15.4918134 33.8099441,7.31904911 43.90953,7.30769231 Z") 
+
+
+i.family  <- paste0("path://","M29,34 C37.836556,34 45,26.3888407 45,17 C45,7.61115925 37.836556,0 29,0 C20.163444,0 13,7.61115925 13,17 C13,26.3888407 20.163444,34 29,34 Z M28.5,7 C33.7467051,7 38,11.4771525 38,17 C38,22.5228475 33.7467051,27 28.5,27 C23.2532949,27 19,22.5228475 19,17 C19.006003,11.479772 23.2557834,7.006319 28.5,7 L28.5,7 Z M87,34 C95.836556,34 103,26.3888407 103,17 C103,7.61115925 95.836556,0 87,0 C78.163444,0 71,7.61115925 71,17 C71,26.3888407 78.163444,34 87,34 Z M86.5,7 C91.7467051,7 96,11.4771525 96,17 C96,22.5228475 91.7467051,27 86.5,27 C81.2532949,27 77,22.5228475 77,17 C77.006003,11.479772 81.2557834,7.006319 86.5,7 L86.5,7 Z M96.6666667,41 L77.3333333,41 L77.3333333,47.75 L96.6666667,47.75 C103.781735,47.7582584 109.547671,53.7975793 109.555556,61.25 L109.555556,81.5 C109.551471,85.2261487 106.668586,88.2457223 103.111111,88.25 L81.9900889,88.25 C83.1484957,86.2065583 83.7655997,83.8764815 83.7777778,81.5 C83.7777778,74.0441559 78.0072257,68 70.8888889,68 L45.1111111,68 C37.9927743,68 32.2222222,74.0441559 32.2222222,81.5 C32.2344003,83.8764815 32.8515043,86.2065583 34.0099111,88.25 L12.8888889,88.25 C9.33141355,88.2457223 6.4485285,85.2261487 6.44444444,81.5 L6.44444444,61.25 C6.45247081,53.7976409 12.2183238,47.7584069 19.3333333,47.75 L38.6666667,47.75 L38.6666667,41 L19.3333333,41 C8.65582817,41 0,50.0662338 0,61.25 L0,81.5 C0,88.9558441 5.77055211,95 12.8888889,95 L103.111111,95 C110.229448,95 116,88.9558441 116,81.5 L116,61.25 C116,50.0662338 107.344172,41 96.6666667,41 Z M44.5,88 C40.9101491,88 38,84.8659932 38,81 C38,77.1340068 40.9101491,74 44.5,74 L70.5,74 C74.0898509,74 77,77.1340068 77,81 C77,84.8659932 74.0898509,88 70.5,88 L44.5,88 Z M58,61 C65.1797017,61 71,54.9558441 71,47.5 C71,40.0441559 65.1797017,34 58,34 C50.8202983,34 45,40.0441559 45,47.5 C45,54.9558441 50.8202983,61 58,61 Z M57.5,40 C61.0898509,40 64,43.1340068 64,47 C64,50.8659932 61.0898509,54 57.5,54 C53.9101491,54 51,50.8659932 51,47 C51.0041193,43.1358457 53.9118568,40.0044361 57.5,40 L57.5,40 Z" )
+
+
+
+```
+
+```{r}
+library(echarts4r)
+
+data2 <- dt %>%
+        filter(is_canceled==0)%>%
+        mutate(customer_type2 = ifelse(adults >2,"Groups",
+                                       ifelse(adults==2 & children==0 & babies==0,"Couple",
+                                              ifelse(adults==1, "Individual","Family")))) %>%
+        select(customer_type2, Revenue)%>%
+        group_by(customer_type2)%>%
+        summarise(`Total Revenue` = sum(Revenue))%>%
+        mutate(`Revenue.p` = round((`Total Revenue` /sum(`Total Revenue`)*100),digits = 2 ))
+        
+data2$image <- c(i.couple, i.family, i.group,i.individual)
+data2$order <- c(2,3,4,1)
+
+data2 <- as.data.frame(data2)%>%
+        arrange(order)
+
+
+  data2 %>% 
+  e_charts(customer_type2) %>% 
+  e_x_axis(splitLine=list(show = FALSE), 
+           axisTick=list(show=FALSE),
+           axisLine=list(show=FALSE),
+           axisLabel= list(show=FALSE)) %>%
+  e_y_axis(max=100, 
+           splitLine=list(show = FALSE),
+           axisTick=list(show=FALSE),
+           axisLine=list(show=FALSE),
+           axisLabel=list(show=FALSE)) %>%
+  e_color(color = c("#E3BC29","#4D677C") ) %>%
+  e_pictorial(Revenue.p, symbol = image, z=10, name= 'realValue', 
+              symbolBoundingData= 100, symbolClip= TRUE) %>% 
+  e_pictorial(Revenue.p, symbol = image, name= 'background', 
+              symbolBoundingData= 100) %>% 
+  e_labels(position = "bottom", offset= c(0, 10), 
+           textStyle =list(fontSize= 12, fontFamily= 'Arial', 
+                           fontWeight ='bold', 
+                           color= "#95B488"),
+           formatter="{@[1]}% {@[0]}") %>%
+  e_legend(show = FALSE) %>%
+  e_theme("westeros")%>%
+  e_title("Revenue from clients")
+
+
+```
+
+### Calculated Occupancy 
+```{r}
+
+library(lubridate)
+
+
+data.occ <- dt %>%
+        filter(is_canceled ==0,
+               reservation_status== "Check-Out") %>%
+        select(Customers,arrival_date_month, arrival_date_day_of_month, arrival_date_year, total_days)%>%
+        mutate(Arrive= paste(sep = "/",  arrival_date_day_of_month,arrival_date_month,arrival_date_year)) %>%
+        mutate(Arrival = dmy(Arrive))%>%
+        mutate(Departure= Arrival + days(total_days)) %>%
+        select(Customers,Arrival, Departure) 
+
+#Preparing for the occupancy function
+data.occ <- as.data.frame(lapply(data.occ, rep, data.occ$Customers)) # I need this for the occupancy function 
+
+data.occ$Arrival <-as.POSIXct(data.occ$Arrival)
+data.occ$Departure <-as.POSIXct(data.occ$Departure)
+
+
+
+#library(plyr) 
+library(hillmakeR)
+
+hotel.occupancy <- occupancy(startTimes=data.occ$Arrival, 
+                        stopTimes=data.occ$Departure, resolution="day", initial = 1)
+
+
+# Prepare for dygraph
+library(xts)
+hotel.occ <- xts(hotel.occupancy$counts, as.Date(hotel.occupancy$times, format='%m/%d/%Y'))
+
+#============
+# The Graph
+#============
+
+library(dygraphs)
+
+dygraph(hotel.occ,main = "Hotel Occupancy 2015-2017 ",ylab = "Occupancy",xlab = "Time") %>% 
+dyRangeSelector(fillColor = "#95B488",strokeColor = "#95B488" ) %>%
+dyOptions(colors ="#E3BC29",drawPoints = TRUE, pointSize = 2) %>%
+dySeries("V1", label = "Occupancy") %>%
+dyLegend(show = "follow", hideOnMouseOut = T) 
+
+
+
+
+
+```
+
+Row
+-------------------------------------
+### Where do our clients come from?
+
+```{r}
+library(leaflet)
+library(maps)
+
+# Coordinates:
+ # Taken from: https://gist.github.com/tadast/8827699#file-countries_codes_and_coordinates-csv
+
+ccc <- read_csv("countries_codes_and_coordinates.csv")%>%
+        select(- c('Alpha-2 code', 'Numeric code' ))
+
+
+# Prepare the data I want to visualize
+ data3 <- dt %>%
+         filter(is_canceled==0, country != "NULL")%>%
+         select(Customers, country)%>%
+         group_by(country) %>%
+         summarise(Customers= sum(Customers))
+ 
+ # What does not match?
+#Checking <- anti_join(data3, ccc, by = c("country" = "Alpha-3 code"))
+#table(Checking$country)
+ 
+# Ok here china is listed as CN but should have been CHN; and East Timor as TMP instead of TLS
+
+# Let's fix that:
+data3 <- data3 %>%
+        mutate("Alpha-3 code"= ifelse(country=="CN","CHN",
+                                      ifelse(country=="TMP","TLS", country)))
+
+# Join the datasets
+
+ data4 <-left_join(data3,ccc)%>% 
+        rename(lat= "Latitude (average)",
+               lng= "Longitude (average)") %>%
+         distinct(country,.keep_all = TRUE) %>%
+         select(`Alpha-3 code`,Country,Customers,lat,lng) 
+ 
+data4 <- as.data.frame(data4)
+
+
+# Create yearly data for the labels:
+  data.yearly <- dt %>%
+         filter(is_canceled==0, country != "NULL")%>%
+         select(Customers, country, arrival_date_year)%>%
+         group_by(country,arrival_date_year) %>%
+         summarise(Customers.y= sum(Customers))%>%
+          group_by(country)%>%
+          spread(arrival_date_year,Customers.y)%>%
+          mutate("Alpha-3 code"= ifelse(country=="CN","CHN",
+                                      ifelse(country=="TMP","TLS", country)))%>%
+          replace_na(list(`2015`=0, `2016`=0, `2017`=0))
+  
+ #The dataset complete: 
+data.map<- left_join(data4, data.yearly,by="Alpha-3 code" ) %>% distinct(country,.keep_all = TRUE) %>% select(-country)%>%
+        mutate(y1 = paste0("During 2015: ",`2015`),
+               y2=  paste0("During 2016: ",`2016`),
+               y3= paste0("During 2016: ",`2016`), 
+               content = paste(sep = "<br/>",Country, "Yearly visitors:  ", y1, y2,y3))
+       
+
+#==============
+#Create the map
+#==============
+
+  map<-leaflet(data.map) %>%
+  addTiles() %>%
+  addProviderTiles(providers$CartoDB.DarkMatter) %>%
+  addCircles(lng = ~lng, lat = ~lat, weight = 3,
+   radius = ~Customers*100, popup = ~content,color = "#4D677C", fillColor = "#95B488") %>%  
+        flyToBounds(-24.077095,69.778043,-18.100532,-39.098001)
+map
+
+
+```
+
+```{r, eval=FALSE}
+#===================
+# Graph alternativo
+#===================
+ # Only with those booking more than hundred peple
+
+
+      plot2 <-data.map%>% select(Country,`2015`,`2016`,`2017`)%>%
+        gather(Year, `Number of visitors`, -Country)%>%
+        filter(`Number of visitors` > 100)%>%
+        ggplot(aes(`Number of visitors`, Country, col=Year))+
+        scale_color_manual(values=c("#E3BC29","#4D677C","#D77E6F"))+
+        ggtitle("Amount of visitor per country from 2015 to 2017")+
+        xlab("Number of visitors")+
+        geom_point()+ 
+        marce_theme
+
+    ggplotly(plot2)
+```
+
+### Which channel yiedls higher revenue?
+   
+```{r Which is the best channel?}
+#-----------------------------------------
+# Who brought the higher amount of people?
+#-----------------------------------------
+
+# Graphic adapted from https://www.r-graph-gallery.com/299-circular-stacked-barplot.html
+
+# Hay uno negativo y otros en cero, como no se las razones lo quito y ya.>>>> REVISAR ESTO !!!!
+
+
+        data <- dt%>%
+        filter(is_canceled==0,
+               distribution_channel != "Undefined") %>% # Undefined is only one reservation so can be neglected
+        select(distribution_channel,arrival_date_year, Revenue)%>%
+        group_by(distribution_channel,arrival_date_year) %>%
+        summarise(`Total Revenue`= sum(Revenue))%>%
+        rename(Year= arrival_date_year,Channel= distribution_channel)
+
+        data$Year<- as.factor(data$Year )
+        data <-as.data.frame(data)
+
+        
+      
+#=================
+# Create the plot
+#=================
+        marce_theme <-  theme_light() +  theme(legend.background = element_blank(),
+                      legend.key = element_blank(),
+                      axis.line = element_line(colour = "black"),
+                      plot.title = element_text(size = 12, hjust = 0.5))
+        
+require(scales)
+library(plotly)
+  
+  plot1 <- ggplot(data) +      
+   geom_bar(aes(x=Year, y=`Total Revenue`,fill=Channel), stat="identity") +
+   scale_fill_manual(values = c("#E3BC29","#4D677C","#D77E6F","#95B488"))+
+   scale_y_continuous(labels = comma) +  
+          ylab("Total Revenue")+
+           marce_theme+
+           theme(legend.direction = "horizontal",
+                      legend.position= "bottom")
+  
+           ggplotly(plot1)
+
+```
+
+
+
+
+Additional Information 
+===================================== 
+
+### Original Dataset Information
+
+  
+   Variable                      |   Description  
+---------------------------------|---------------------------------
+Hotel                            |Resort Hotel or City Hotel
+is_canceled                      |Value Indicating if the booking was canceled (1) or not (0)
+lead_time                        |Number of days that elapsed between the entering date of the booking into the PMS and the arrival date
+arrival_date_year                |Year of arrival date
+arrival_date_month               |Month of arrival date
+arrival_date_week_number         |Week number of year for arrival date
+arrival_date_day_of_month        |Day of arrival date
+stays_in_weekend_nights          |Number of weekend nights (Saturday or Sunday) the guest stayed or booked to stay at the hotel
+stays_in_week_nights             |Number of week nights (Monday to Friday) the guest stayed or booked to stay at the hotel
+adults                           |Number of adults
+children                         |Number of children
+babies                           |Number of babies
+meal                             |Type of meal booked. Categories are presented in standard hospitality meal packages: *Undefined/SC* – no meal package  *BB* – Bed & Breakfast *HB* – Half board (breakfast and one other meal – usually dinner) *FB* – Full board (breakfast, lunch and dinner)
+country                          |Country of origin. Categories are represented in the ISO 3155–3:2013 format
+market_segment                   |Market segment designation. In categories, the term “TA” means “Travel Agents” and “TO” means “Tour Operators”
+distribution_channel             |Booking distribution channel. The term “TA” means “Travel Agents” and “TO” means “Tour Operators”
+is_repeated_guest                |Value indicating if the booking name was from a repeated guest (1) or not (0)
+previous_cancellations           |Number of previous bookings that were cancelled by the customer prior to the current booking
+previous_bookings_not_canceled   |Number of previous bookings not cancelled by the customer prior to the current booking
+reserved_room_type               |Code of room type reserved. Code is presented instead of designation for anonymity reasons.
+assigned_room_type               |Code for the type of room assigned to the booking. Sometimes the assigned room type differs from the reserved room type due to hotel operation reasons (e.g. overbooking) or by customer request. Code is presented instead of designation for anonymity reasons.
+booking_changes                  |Number of changes/amendments made to the booking from the moment the booking was entered on the PMS until the moment of check-in or cancellation
+deposit_type                     |Indication on if the customer made a deposit to guarantee the booking. This variable can assume three categories:  *No Deposit* – no deposit was made, *Non Refund* – a deposit was made in the value of the total stay cost  *Refundable* – a deposit was made with a value under the total cost of stay.
+agent                            |ID of the travel agency that made the booking
+company                          |ID of the company/entity that made the booking or responsible for paying the booking. ID is presented instead of designation for anonymity reasons
+days_in_waiting_list             |Number of days the booking was in the waiting list before it was confirmed to the customer
+customer_type                    |Type of booking, assuming one of four categories: *Contract* -When the booking has an allotment or other type of contract associated to it; *Group* When the booking is associated to a group;*Transient* When the booking is not part of a group or contract, and is not associated to other transient booking; *Transient-party* When the booking is transient, but is associated to at least other transient booking
+adr                             |Average Daily Rate as defined by dividing the sum of all lodging transactions by the total number of staying nights
+required_car_parking_spaces     |Number of car parking spaces required by the customer
+total_of_special_requests       |Number of special requests made by the customer (e.g. twin bed or high floor)
+reservation_status              |Reservation last status, assuming one of three categories: Canceled – booking was canceled by the customer; Check-Out -Customer has checked in but already departed; No-Show – customer did not check-in and did inform the hotel of the reason why
+reservation_status_date         |Date at which the last status was set. This variable can be used in conjunction with the ReservationStatus to understand when was the booking canceled or when did the customer checked-out of the hote
+
+
