@@ -1,0 +1,43 @@
+---
+title: "Terrorism dataset "
+author: "Marce"
+date: "3/5/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(eval = FALSE, warning = FALSE, message = FALSE)
+```
+
+The data for this visualization was extracted from [Kaggle](https://www.kaggle.com/START-UMD/gtd)
+ Please find this visualization in my [`Tableau page`](https://public.tableau.com/profile/marcequilep)
+ 
+### Preparing the data for Tableau
+
+For this visualization I will extract only the data I am interested on.
+```{r}
+# Time period: 1970-2017, except 1993
+
+library(readr)
+library(dplyr)
+dt <- read_csv("Datasets/globalterrorismdb_0718dist.csv")%>%
+        select(iyear,imonth,iday,country_txt,extended,success,attacktype1_txt,targtype1_txt,weaptype1_txt,nkill)
+
+
+# Looking for odd data?
+str(dt)
+head(dt)
+lapply(dt,FUN = table)
+
+
+# Generate the dataset for tableau
+dt <- dt%>%
+        mutate(country= ifelse(country_txt=="West Germany (FRG)", "Germany",
+                               ifelse(country_txt=="East Germany (GDR)", "Germany",country_txt)))%>%
+        select(-country_txt)
+
+write.csv(dt,file="terrordata.csv")
+
+
+```
+ 

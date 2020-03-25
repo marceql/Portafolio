@@ -1,0 +1,718 @@
+---
+title: "Annual Environmental Management Report <br> Example: Municipality of Escazú 2018"
+output: 
+  html_document:
+    code_folding: hide
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+    theme: united
+    highlight: monochrome 
+    fontsize: 11 pt
+    mainfont: Palatino 
+
+---
+
+<script>
+   $(document).ready(function() {
+     $head = $('#header');
+     $head.prepend('<img src=\"logo.jpg\" style=\"float: right;width: 250px;\"/>')
+   });
+</script>
+
+
+<style type="text/css">
+
+h1.title {
+  font-size: 30px;
+  color: #403938;
+}
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo =F, message = F,warning = F)
+```
+
+***
+
+## Product Description 
+
+In some cases, an organization needs to perform an analysis on a regular basis to audit some of their processes or meet governmental requirements, such as the case of operational reports of water treatment plants, air monitoring of industrial equipment emission, waste management, record and evaluation of environmental indicators, carbon footprints, etc.  
+
+For these purposes and based on the customer requirements, we turn the current datasets into an organized and structured document to record future data, in a way that is more easily processed.  Additionally, we provide the customer with a customized template to automate their quality assessment procedures. This template will generate a report such as this one, either in pdf or HTML formats.  
+
+**Our service will improve the capacity to process, analyze and visualize data, simplifying the audit procedures while minimizing the time required, and enhancing performance with data-driven decisions.**
+
+This report has has been generated with the information provided by the Municipality of Escazú,Costa Rica for 2018.  The code used to generate this report is available in my [Github](https://github.com/marceql/Portafolio).
+
+Both, the solid waste collection and the surface water quality data of the Escazú city are gathered on a monthly basis. Therefore it is an ideal example for a rutinary report where we can provide a template to automate it.  
+
+In this example, as the Municipality works with Microsoft Excel, we transformed the given data and exported it into a new and structured Excel file so they can easily keep updating it; as well, this new file will serve as input to generate this report. *This way, the customer will be able to run the code themselves and recreate or update the results easily* 
+
+
+```{r, eval=FALSE}
+library(readxl)
+library(dplyr)
+library(tidyr)
+library(lubridate)
+library(purrr)
+library(stringr)
+
+#==============
+# Water Quality
+#==============
+
+#------------------
+# Import all sheets 
+#------------------
+path <- "Datasets/Analisis fisico-quimicos de las muest ras de agua en rios ano 2017-2018.xlsx"
+
+dt <- path %>% 
+  excel_sheets() %>% 
+  set_names() %>% 
+  map(read_excel,skip = 2, path = path)
+
+data <- bind_rows(dt) 
+    
+#-------------
+# Prepare data   
+#--------------
+data[96,6:11] <- data[96,22:27] 
+data <-data[,1:21]
+
+data <-data %>%# Going to traslate for our purposes
+        rename(Location = `...1`, 
+               `Type of Sample` = `...2`,
+               `Sampling Date`= `...3`,
+               `Turbidity (NTU)`= `Turbiedad (NTU)`, 
+               `Chloride (mg/l)` =`Cloruro (mg/l)`,
+               `Nitrite (µg/l)`= `Nitrito (µg/l)`,
+               `Nitrate (mg/l)` = `Nitrato (mg/l)`,
+               `Sulfate (mg/l)`=`Sulfato (mg/l)`,
+               `Sodium (mg/l)`=`Sodio (mg/l)`,
+               `Potassium (mg/l)` =`Potasio (mg/l)`,
+               `BOD (mg/l)`=`DBO(mg/l)`,
+               `COD (mg/l`= `DQO(mg/l)`,
+               `Total Suspended Solids (mg/l)`= `Sólidos Suspendidos Totales (mg/l)`,
+               `Sedimentable Solids (mg/l)` = `Sólidos Sedimentables (ml/l)`,
+               ` MBAS (mg/l)`= `SAAM (mg/l)`,
+               `Ammonium (µg/l)` = `Amonio (µg/l)`,
+               `Total Phosphorus (mg/l)`= `Fósforo Total (mg/l)`,
+               `Temperature  (℃)` = `Temperatura (℃)`,
+               `Dissolved Oxygen (mg/l)`= `Oxígeno Disuelto (mg/l)`,
+               `Water Saturation (%)`= `% Saturación (%)` ) %>%
+        mutate(`Type of Sample`= ifelse(`Type of Sample`=="Agua para uso y consumo humano", "Drinking water",
+                                        ifelse(`Type of Sample`=="Natural simple", "Natural", "ERROR"))) %>%
+        mutate(`Sampling Date`=gsub(pattern = " del ", replacement = "/", `Sampling Date`),
+               `Sampling Date`=gsub(pattern = " de ", replacement = "/", `Sampling Date`),
+               `Sampling Date`=gsub(pattern = "enero", replacement = "jan", `Sampling Date`),
+               `Sampling Date`=gsub(pattern = "febrero", replacement = "feb", `Sampling Date`),
+               `Sampling Date`=gsub(pattern = "marzo", replacement = "mar", `Sampling Date`),
+               `Sampling Date`=gsub(pattern = "abril", replacement = "apr", `Sampling Date`),
+               `Sampling Date`=gsub(pattern = "mayo", replacement = "may", `Sampling Date`),
+               `Sampling Date`=gsub(pattern = "junio", replacement = "jun", `Sampling Date`),
+               `Sampling Date`=gsub(pattern = "julio", replacement = "jul", `Sampling Date`),
+               `Sampling Date`=gsub(pattern = "agosto", replacement = "aug", `Sampling Date`),
+               `Sampling Date`=gsub(pattern = "septiembre", replacement = "sep", `Sampling Date`),
+               `Sampling Date`=gsub(pattern = "octubre", replacement = "oct", `Sampling Date`),
+               `Sampling Date`=gsub(pattern = "noviembre", replacement = "nov", `Sampling Date`), 
+               `Sampling Date`=gsub(pattern = "diciembre", replacement = "dic", `Sampling Date`),
+                `Sampling Date`=dmy(`Sampling Date`))
+                       
+
+
+
+#============
+# Solid Waste
+#============
+
+#----------------
+# Import Dataset
+#---------------
+
+
+Dt <- read_excel("Datasets/Residuos_ME.xlsx", 
+    skip = 3)%>%
+        select(-Tendencia, -Total)%>%
+        na.omit() %>%
+        filter(RESIDUOS !="Total")
+
+#--------------------
+# Prepare the dataset
+#--------------------
+
+Data <- Dt%>%
+        gather(Month,`Kg Collected` ,-RESIDUOS)%>%
+        mutate(Date = ifelse(Month=="Ene","31-01-18",
+                             ifelse(Month== "Feb","27-02-18",
+                                    ifelse(Month=="Mar","30-03-18",
+                                           ifelse(Month=="Abr","30-04-18",
+                                                  ifelse(Month=="May", "31-05-18",
+                                                         ifelse(Month=="Jun","30-06-18",
+                                                                ifelse(Month=="Jul","31-07-18",
+                                                                       ifelse(Month=="Ago","31-08-18",
+                                                                              ifelse(Month=="Sep","30-09-2018",
+                                                                                     ifelse(Month=="Oct","31-10-2018",
+                                                                                            ifelse(Month=="Nov","30-11-2018",
+                                                                                                   ifelse(Month=="Dic","30-12-2018","ERROR"))))))))))))) %>% 
+        select(-Month) %>%
+        mutate(Date=dmy(Date))%>%
+        rename(`Waste Type`=RESIDUOS) %>%
+        mutate(`Waste Type`= ifelse(`Waste Type` == "TRADICIONAL","Traditional", 
+               ifelse(`Waste Type` == "JARDIN","Garden",
+                      ifelse(`Waste Type` == "RECICLAJE", "Recyclable",
+                             ifelse(`Waste Type` == "NO TRADICIONAL", "Non-Traditional",
+                                    ifelse(`Waste Type` == "ESCOMBRO", "Rubble", "ERROR")))))) %>% 
+        select(Date, everything())
+
+
+
+#-----------------------------
+# Export Datasets in one sheet
+#-----------------------------
+
+library(openxlsx)
+
+list_of_datasets <-
+  list("Solid_Waste" = Data, "Water_Quality" = data)
+
+write.xlsx(list_of_datasets, "Escazu workbook.xlsx")
+
+```
+
+***
+
+## Introduction 
+
+
+> **This EDA is __only__ with illustrative purposes**   
+
+Escazú is a canton located in the west of San José city, the national capital city of Costa Rica and it is one of the wealthiest cities in the country. 
+
+The data we have was gathered in 2017-2018, however, in December 2018 the municipality published the PMGIRS (Municipality's Integral Solid Waste Management Plan by its Spanish acronym). Hence it is likely that the data presented in this report is no longer the reflection of the city solid waste management. 
+
+At the time of collection of the data, Escazú population was estimated to be 68 728 inhabitants and in the case of solid waste the municipality dealt with solid waste as follow:
+
+ * **Traditional Waste:**  Landfill  
+ * **Recyclable Material:**   Recycling center  
+ * ** Non-Traditional Waste:**   Landfill  
+ * **Garden Waste:**    Landfill  
+
+
+In terms of surface water quality, the government requires to follow the decree No 33903-MINAE-S. In this regulation are listed the most important parameters to be tested and how to classify the quality of surface water accordingly.
+
+Since this is an example, our intention is mainly to generate an exploratory data analysis to illustrate the product we offer.  
+***
+
+## Results 
+
+```{r call datasets}
+library(readxl)
+library(lubridate)
+library(dplyr)
+
+data <- read_excel("Escazu workbook.xlsx", 
+    sheet = "Solid_Waste") %>%
+        mutate(Date = ymd(Date),
+               `Kg Collected`= as.numeric(gsub(pattern = "\\.", replacement = "",x=`Kg Collected`)))
+        
+
+Data <- read_excel("Escazu workbook.xlsx", 
+    sheet = "Water_Quality") %>%
+        mutate(`Sampling Date` = ymd(`Sampling Date`))
+# The client will be given the project and by the only remaining task will be filled mensually
+
+```
+
+
+In this section, you will find the exploratory analysis that is routinely performed with this dataset both, from solid waste collection and surface water quality of the Municipality of Escazú.  
+
+If we continue recording the data, this will be a very useful tool to identify time-related patterns and areas where intervention must be prioritized.
+
+
+***
+### Municipality Solid Waste (MSW){.tabset .tabset-fade .tabset-pills}
+
+
+***
+#### Monthly Overview
+```{r}
+library(ggplot2)
+library(tidyverse)
+library(tidyr)
+library(lubridate)
+library(plotly)
+library(scales)
+
+#--------------------
+# Create the graph
+#--------------------
+
+data$Date <- data$Date-26 # Little trick
+
+plot1 <-ggplot(data, aes(Date,`Kg Collected`, col= `Waste Type`)) +
+        geom_line(alpha=0.4)+
+        geom_point(aes(text=sprintf("Kg Collected: %s<br> Type of Waste: %s", `Kg Collected`, `Waste Type`))) + 
+        scale_color_manual(values= c("#F8B195","#C06C84","#6C5B7B", "#355C7D","#F67280"))+
+        theme_classic() + 
+         theme(legend.direction = "horizontal",
+               legend.position= "bottom",
+               plot.title = element_text(size = 12, hjust = 0.5),
+               panel.grid.major.y = element_line('#E6E4E7')) +
+        ggtitle("Waste collected in 2018 \n Escazú Municipality" )  +
+        scale_x_date(date_breaks = "1 month", date_labels =  "%b \n %Y", breaks = year(data$Date) )
+
+ggplotly(plot1, tooltip = "text") 
+
+
+
+```
+
+```{r}
+#--------------
+# Monthly Data
+#--------------
+dt <- data %>%
+        spread(`Waste Type`,-Date)%>%
+        mutate(Month = month(Date, abbr = F, label = T),
+               Year= year(Date),
+               Total= Rubble+ Garden+ `Non-Traditional`+ Recyclable + Traditional)%>%
+        select(Month, Year,everything(),-Date)
+
+
+library(knitr)
+library(kableExtra)
+
+# Monthly Proportions
+dty <- dt  %>% gather(`Waste Type`, `Kg`,-c(Month, Year, Total)) %>% 
+        group_by(Month, `Waste Type`) %>%
+         mutate(` % `= round( 100*( `Kg`/Total ), digits = 2))  %>% 
+         group_by(Month,`Waste Type`) %>% 
+         summarise(`( % )`= sum(` % `)) %>%
+         mutate(`( % )`= paste(`( % )`,"%"))%>%
+        spread(`Waste Type`,`( % )` )
+ 
+  
+          kable(dty, caption = "Monthly Composition of Waste" )%>%
+          kable_styling(bootstrap_options = "striped", font_size = 10,full_width = T) 
+   
+          
+```
+
+***
+#### Yearly Composition of Waste
+
+```{r,out.width="100%", fig.align="center"}
+
+ ggplot(data = data) + 
+  geom_bar(mapping = aes(x = `Waste Type`, y= `Kg Collected`, fill = `Waste Type`), show.legend = T, width =1, stat = "identity") +
+  scale_fill_manual(values=  c("#F8B195","#C06C84","#6C5B7B", "#355C7D","#F67280")) +
+  theme(panel.background=element_blank(),
+        panel.grid.major = element_line(colour = "#DCDADD"),
+        aspect.ratio = 1,
+        plot.title = element_text(size = 12, hjust = 0.5),
+        legend.direction = "horizontal",
+        legend.position= "bottom",
+        legend.text = element_text(size=5),
+        legend.title = element_blank()) +
+        scale_y_continuous(labels = scales::comma)+
+  labs(x = NULL, y = NULL) +
+        coord_polar()+
+        ggtitle("Yearly Composition of Waste \n collected by Escazú Municipality")
+
+
+
+```
+
+```{r,results='asis'}
+#--------------------
+# Anual Proportions
+#--------------------
+library(knitr)
+dtx <- dt  %>% gather(`Waste Type`, `Kg`,-c(Month, Year, Total)) %>% 
+         mutate(` % `= round( 100*( `Kg`/sum(dt$Total) ), digits = 2)) %>% 
+         group_by(`Waste Type`) %>% 
+         summarise(`( % )`= sum(` % `))
+ 
+  
+        kable(dtx, caption = "Yearly Composition of Waste",format='html', output = FALSE) %>%
+        kable_styling(bootstrap_options = "striped", font_size = 10,full_width = T,  position = "right")%>%
+           scroll_box(width = "80%", height = "250px")
+   
+          
+   # Total 
+         Total <-c(Total= sum(dt$Total), `Per Capita`= round(sum(dt$Total)/68728, digits = 2), `Daily Rate`=round(sum(dt$Total)/365, digits = 2) )
+              
+        kable(Total, caption = "Total Kg of waste collected per year",format='html', output = FALSE) %>%
+          kable_styling(bootstrap_options = "striped", font_size = 10 ,full_width = T, position = "float_left") %>%
+           scroll_box(width = "80%", height = "180px")
+
+
+
+```
+
+***
+#### Tabulated Data
+```{r, results='asis'}
+
+kable(dt, caption = "Waste Collection Data") %>%
+kable_styling(bootstrap_options = "striped", font_size = 10,full_width = T) 
+  
+        
+        
+
+```
+
+***  
+
+
+### Water Quality in Rivers {.tabset .tabset-fade .tabset-pills}
+
+According to the No 33903-MINAE-S decree, surface water in Costa Rica is initially characterized based on three main parameters: Biochemical Oxigen Demand, Ammoniacal Nitrogen, and Percentage of Oxigen Saturation. Additionally, in the same regulation, there are other parameters that can be used as complement to evaluate the water quality. 
+
+Following the decree, each parameter benchmarks are set to classify the water quality into five categories depending on the measurement's result, being 1 the best quality. In this case, as part of our exploratory data analysis, in order to compare the rivers and measurements, we classified each parameter according to the decree and visualized it to identify:  
+
++ Which river seems to have the lowest quality?
++ Which parameter is more problematic?
++ Do we find higher contamination in the lower part of the river in comparison to the upper?
++ Can we see time trends?
+
+Some of the complementary parameters included in the No 33903-MINAE-S decree were tested by the Municipality of Escazú, after classifying them into the five categories, we observed:
+
+-- The **BOD, COD, MBAS** and **Nitrate** preset consistently high scores throughout the year in mainly all rivers while others such as **Sulfate, Chloride, Turbidity** were consistently categorized as good quality (score=1). 
+
+-- For **Ammonium** in **Rio Acres**, we notice that it is usually higher in the lower sampling point than in the upper one and the results in September 2017 were higher than the rest of the time measured.
+
+-- **BOD**  and **MBAS** are always and for all rivers very high, with no time trend or location trend observed.  
+
+-- For **COD** for **Rio Cruz** we see that usually, the measurements are higher in the lower side of the river compared to the measurements taken in the upper part, and for the same parameter **Quebrada Yeguas** consistently presents high measurements.  
+
+-- **Nitrate** measurements in **Quebrada Herrera, Rio Cruz, Convento, Chiquero and Acres** is higher when samples are taken in the lower part of the river in comparison to the upper parts; but in **Rio Yeguas** concentrations are very similar throughout the river.
+
+
+-- Now, if we consider all the samples taken for every river without accounting for time or location, we can see that **Quebrada Quebradillas**, **Quebrada Yeguas** and **Rio Convento** are the rivers with higher **BOD** and **COD**. On the other hand  **Quebrada Higuerones** is the one with higher **MBAS**, although high measurements are seen for **Quebrada Yeguas** and **Rio Acres, Chiquero** and **Cruz**. Finally, for **Nitrate**, **Quebrada Yeguas** is the one with higher concentrations measured. 
+
+
+```{r}
+# Arrange the dataset
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+#==============
+# Prepare Data
+#==============
+
+
+# 1. Reshape data
+ data2 <- Data %>% 
+        select(Location,`Sampling Date`,`Turbidity (NTU)`,`PH (25℃)`,`Nitrate (mg/l)`,`COD (mg/l`, `BOD (mg/l)`,`Chloride (mg/l)`,`Total Suspended Solids (mg/l)`, `MBAS (mg/l)`,`Sulfate (mg/l)`, `Ammonium (µg/l)`, `Water Saturation (%)`) %>%# Only the parameters present in the Act No 33903-MINAE-S
+        gather(key =Parameter, value =Value, -c(Location,`Sampling Date`)) %>%
+        separate(Value, into = c("Result", "Uncertanity"),sep = "±") %>%
+        
+# 2. Clean the data 
+        mutate(Location= gsub(Location, pattern = "Yegas", replacement = "Yeguas") ,
+               Location= gsub( Location,pattern = "Río Herrera ", replacement = "Quebrada Herrera "),
+               Result= gsub(Result, pattern = ",", replacement = "."),
+               Result= gsub(Result, pattern = "<", replacement = ""), 
+               Result= gsub(Result, pattern = "nd", replacement = "0"), 
+               Result= gsub(Result, pattern = "d", replacement = "0"), 
+               Result= gsub(Result, pattern = "-", replacement = ""), 
+               Uncertanity= gsub(Uncertanity, pattern = ",", replacement = "."),
+               Location= gsub(Location, pattern = "parte", replacement = ",parte"), 
+               Location= gsub(Location, pattern = "Chiquero ", replacement = "Chiquero")) %>%
+        separate(Location, into = c("River", 'Sampling Location'),sep = ",") %>%
+        mutate(`Sampling Location`= ifelse(River== "Inicio de la cuenca"| River== "Mitad de la cuenca"| River== "Final de la cuenca" ,River, `Sampling Location`), 
+               River= ifelse(River== "Inicio de la cuenca"| River== "Mitad de la cuenca"| River== "Final de la cuenca" ,"Río Chiquero",
+                             ifelse(River=="Quebradillas ", "Quebrada Quebradillas ", River))) %>%
+        mutate(`Sampling Location`= ifelse(`Sampling Location` == "Inicio de la cuenca", "parte alta", 
+                                ifelse(`Sampling Location` == "Final de la cuenca", "parte baja",
+                                ifelse(`Sampling Location` == "Mitad de la cuenca", "parte media", `Sampling Location`))), 
+               
+               `Sampling Location`= ifelse(`Sampling Location` == "parte alta"|`Sampling Location` == "parte Alta" , "Upper",
+                                ifelse(`Sampling Location` ==  "parte baja" |`Sampling Location` == "parte Baja","Lower",
+                                ifelse(`Sampling Location` == "parte media"| `Sampling Location` == "parte Media", "Middle", `Sampling Location`)))) %>%
+        select(-Uncertanity) %>% # Por ahora
+        spread(Parameter, Result) 
+        
+
+# 2.1 Make sure every data point is numeric
+
+library(plyr)  
+all_to_num <- function(x) as.numeric(x)
+data2[,4:14] <- colwise(all_to_num)(data2[,4:14] )
+data2$`Ammonium (µg/l)`<- round(data2$`Ammonium (µg/l)`, digits = 1)
+detach("package:plyr", unload=TRUE)
+
+
+# 3. Classify the data into the categories for water quality
+
+data2 <- data2 %>%
+        mutate(BOD.points = ifelse(`BOD (mg/l)` <=3, 1,
+                                   ifelse(`BOD (mg/l)` >3.1 &`BOD (mg/l)` <= 6.0, 2,
+                                   ifelse(`BOD (mg/l)` >= 6.1 &`BOD (mg/l)` <= 9.0, 3,
+                                   ifelse(`BOD (mg/l)` >=9.1 &`BOD (mg/l)` <= 15, 4,
+                                   ifelse(`BOD (mg/l)` > 15, 5,NA))))), 
+               
+               Saturation.points = ifelse(`Water Saturation (%)`>=91 & `Water Saturation (%)` <=100, 1,
+                                          ifelse((`Water Saturation (%)`>=71 & `Water Saturation (%)` <=90) | (`Water Saturation (%)`>=111 &`Water Saturation (%)`<= 120), 2,
+                                          ifelse((`Water Saturation (%)`>=51 & `Water Saturation (%)` <=70) | (`Water Saturation (%)`>=121 &`Water Saturation (%)`<= 130), 3, 
+                                          ifelse(`Water Saturation (%)`>=31 & `Water Saturation (%)` <=50, 4,
+                                          ifelse( `Water Saturation (%)`<=30 | `Water Saturation (%)` > 130, 5,NA))))),
+               Ammonium.points= ifelse(`Ammonium (µg/l)`<=500, 1,
+                                   ifelse(`Ammonium (µg/l)`>=500 & `Ammonium (µg/l)`<=1000, 2, 
+                                   ifelse(`Ammonium (µg/l)`>=1100 & `Ammonium (µg/l)`<=2000,3,
+                                   ifelse(`Ammonium (µg/l)`>=2100 & `Ammonium (µg/l)`<=5000,4,
+                                   ifelse(`Ammonium (µg/l)`>5000, 5, NA))))), # I changed units here
+               Init.Class= BOD.points+ Saturation.points+ Ammonium.points,  
+               Quality = ifelse(Init.Class <= 3 , "Non Contaminated", 
+                                ifelse(Init.Class >=4 & Init.Class<=6, "Low Contamination", 
+                                ifelse(Init.Class >=7 & Init.Class <=9, "Moderate Contamination",
+                                ifelse(Init.Class >=10 & Init.Class <=12,"High Contamination",
+                                ifelse(Init.Class >=13, "Severe Contamination","ERROR"))))),
+               Turbidity.points= ifelse(`Turbidity (NTU)`< 25, 1,
+                                        ifelse(`Turbidity (NTU)`>=25 & `Turbidity (NTU)`<100,2,
+                                        ifelse(`Turbidity (NTU)`>=100,3,NA))),
+               Nitrate.points = ifelse(`Nitrate (mg/l)`< 5 , 1,
+                                  ifelse(`Nitrate (mg/l)`>=5 & `Nitrate (mg/l)`<10, 2,
+                                 ifelse(`Nitrate (mg/l)`>=10 & `Nitrate (mg/l)`<15, 3,
+                                  ifelse(`Nitrate (mg/l)`>=15 & `Nitrate (mg/l)`<20, 4,
+                                 ifelse(`Nitrate (mg/l)`>=20, 5,NA))))),
+               COD.points= ifelse(`COD (mg/l`<20, 1,
+                                  ifelse(`COD (mg/l`>=20 & `COD (mg/l`<25, 2,
+                                  ifelse(`COD (mg/l`>=25 & `COD (mg/l`<50, 3,
+                                  ifelse(`COD (mg/l`>=50 & `COD (mg/l`<100,4,
+                                  ifelse(`COD (mg/l`>=100, 5,NA))))),
+               Chloride.points = ifelse(`Chloride (mg/l)` <100, 1,
+                                  ifelse(`Chloride (mg/l)`>100, 2,NA)),
+               TSS.points = ifelse(`Total Suspended Solids (mg/l)` <10, 1,
+                                 ifelse(`Total Suspended Solids (mg/l)` >=10 & `Total Suspended Solids (mg/l)`<25 , 2,
+                                 ifelse(`Total Suspended Solids (mg/l)` >=25 & `Total Suspended Solids (mg/l)`<100 , 3,
+                                 ifelse(`Total Suspended Solids (mg/l)` >=100 & `Total Suspended Solids (mg/l)`<300 , 4,
+                                 ifelse(`Total Suspended Solids (mg/l)` >=300 ,5 ,NA))))),
+               MBAS.points = ifelse(`MBAS (mg/l)`<1, 3, 
+                                    ifelse(`MBAS (mg/l)`>=1 & `MBAS (mg/l)` < 2, 4,
+                                    ifelse(`MBAS (mg/l)`>2, 3, NA ))),
+               Sulfate.points= ifelse(`Sulfate (mg/l)`<150, 1,
+                                     ifelse(`Sulfate (mg/l)`>=150 & `Sulfate (mg/l)`<250, 2,
+                                     ifelse( `Sulfate (mg/l)`>=250, 3,NA))))
+
+  
+
+```
+
+***
+#### Initial Classification
+
+As ammonium is typically grouped together and referred to as ammoniacal nitrogen, we used it here for the initial classification.
+
+```{r, results='asis', out.width="20%"}
+
+
+# 1. Select only the variables for the initial classification:
+
+data.IC <- data2 %>%
+        select(River:`Sampling Date`, `BOD (mg/l)`,BOD.points, `Water Saturation (%)`,Saturation.points, `Ammonium (µg/l)`, Ammonium.points, Init.Class, Quality)
+
+
+# Rivers with Complete Measurements for the Initial Classification:
+
+dt2 <- data.IC %>% filter(!is.na(Quality)) %>%
+        rename( `BOD score`= BOD.points, 
+                `Water Saturation score` = Saturation.points,
+                `Ammonium Score`= Ammonium.points,
+                `Classification`= Init.Class)
+       
+        kable(dt2, caption = "Samples where all parameters were measured") %>%
+          kable_styling(bootstrap_options = "striped", font_size = 10,full_width = F) 
+
+# So unfortunately only 11 out of 99 have complete measurments, therefore this classification required by law won't be of much information. Mainly because most of the rivers lack the % Saturation measurement.
+
+```
+
+
+```{r, out.width="100%"}
+#-------------
+# Graphic  1
+#-------------
+
+ x <- data.IC%>%
+        filter(!is.na(Quality))%>%
+        mutate(Month= paste(month(`Sampling Date`, abbr = F, label = T), year(`Sampling Date`), sep = ",")) %>%
+        ggplot(aes(`Sampling Location`,River, col=Quality))+
+        geom_point() +
+        facet_grid(.~Month)+
+        scale_color_manual(values = c("#F8B195","#C06C84"))+
+        theme_void()    +
+        theme( axis.title.x = element_text(color="#6C5B7B", size=10, face="bold",margin = margin(t = 15, r = 0, b = 0, l = 0)),
+               axis.title.y = element_text(color="#6C5B7B", size=10, face="bold"),
+               axis.text.y= element_text( color = "black", size = 8, face = "bold"),
+               axis.text.x = element_text( color = "black", size = 8),
+               strip.text.y = element_text(angle = 0, face = "bold", size=8),
+               strip.text.x = element_text(face = "bold", size=8, margin =  margin(t = 5, r = 0, b = 5, l = 0)),
+               panel.grid.major.y = element_line('#E6E4E7'),
+               panel.spacing = unit(1, "lines"),
+               legend.text = element_text(colour="black", size = 8, face = "bold"),
+               legend.title =element_text(colour="black", size = 8, face = "bold"))
+ggplotly(x)
+```
+
+***
+#### Surface Water Quality Parameters 
+
+```{r, fig.height=25, fig.width= 10}
+
+p<- data2 %>%
+        select(-c(`Ammonium (µg/l)`:`Water Saturation (%)`, Init.Class, Quality))%>%
+        gather(Parameter, Points, -(River:`Sampling Date`)) %>%
+        mutate(Parameter= gsub(Parameter, pattern=".points", replacement = "")) %>%
+        ggplot(aes(`Sampling Date`, River, col=`Sampling Location`, size=Points))+
+        geom_point(shape=1, alpha=0.7) +
+        facet_grid(Parameter~., scales = "free", space = "free") +
+        scale_x_date("Sampling date (Month \ Year)", limits = c(min(data2$`Sampling Date`), max(data2$`Sampling Date`)), date_breaks = "1 month", date_labels =  "%b-%y")  +
+        theme_void() + 
+        ggtitle("Comparison of Score obtained by every river and \n parameter measured, according to the No 33903-MINAE-S decree ")+
+        #guides(shape=FALSE) +
+        scale_color_manual(values = c("#900C3F","#C70039","#FF5733" ))  +
+        theme( plot.title = element_text(size = 12, margin=margin(20,10,50,10)),
+               axis.title.x = element_text(color="#6C5B7B", size=10, face="bold",margin = margin(t = 35, r = 0, b = 0, l = 0)),
+               axis.title.y = element_text(color="#6C5B7B", size=10, face="bold",margin = margin(t = 0, r = 0, b = 0, l = 35)),
+               axis.text.y= element_text( color = "black", size = 8),
+               axis.text.x = element_text( color = "black", size = 8),
+               strip.text.y = element_text(angle = 0, face = "bold", size=8 , margin =  margin(t = 0, r = 10, b = 0, l = 10)),
+               strip.background.y =element_blank(), 
+               panel.grid.major.y = element_line('#E6E4E7'),
+               panel.spacing = unit(.5, "lines"),
+               panel.border = element_rect(linetype = "dashed", fill = NA),
+               legend.position="bottom",
+               legend.box = "vertical",
+               legend.text = element_text(colour="black", size = 8, face = "bold"),
+               legend.title =element_text(colour="black", size = 8, face = "bold"))
+     
+
+ ggplotly(p)
+
+```
+
+
+```{Secondary Graphic, fig.width=40, fig.height=30, eval=FALSE}
+
+ data2 %>%
+        select(-c(`Ammonium (µg/l)`:`Water Saturation (%)`, Init.Class, Quality))%>%
+        gather(Parameter, Points, -(River:`Sampling Date`)) %>%
+        mutate(Parameter= gsub(Parameter, pattern=".points", replacement = "")) %>%
+        ggplot(aes(`Sampling Date`, Parameter, col=Points))+
+        geom_point(size= 6) +
+        facet_grid(`Sampling Location`~River, scale="free") +
+        scale_color_gradient(low = "#F8B195", high = "#C06C84", na.value = NA, name="Points Obtained")+
+        scale_x_date("Sampling date (Month \ Year)", limits = c(min(data2$`Sampling Date`), max(data2$`Sampling Date`)), date_breaks = "2 month", date_labels =  "%b \n %y") +
+        theme_classic()+
+        theme(plot.title = element_text(size = 6, hjust = 0.5),
+               axis.title.x = element_text(color="#6C5B7B", size=30, face="bold",margin = margin(t = 15, r = 0, b = 0, l = 0)),
+               axis.title.y = element_text(color="#6C5B7B", size=30, face="bold"),
+               axis.text.y= element_text( color = "black", size = 25, face = "bold"),
+               axis.text.x = element_text( color = "black", size = 22),
+               strip.text.y = element_text(angle = 0, face = "bold", size=25),
+               strip.text.x = element_text(face = "bold", size=25, margin =  margin(t = 20, r = 0, b = 20, l = 0)),
+               panel.grid.major.y = element_line('#E6E4E7'),
+               panel.spacing = unit(.1, "lines"),
+               panel.border = element_rect(linetype = "dashed", fill = NA),
+               legend.position="bottom",
+               legend.text = element_text(colour="black", size = 25, face = "bold"),
+               legend.title =element_text(colour="black", size = 25, face = "bold"))
+
+```
+
+***
+####  Parameter with high scores
+```{r,fig.height=10, fig.width=13}
+
+    data2 %>%
+        select(River, `BOD (mg/l)`, `COD (mg/l`,`MBAS (mg/l)`, `Nitrate (mg/l)`) %>%
+        gather(Parameter, `Quantity`, -(River)) %>%
+        mutate(Quantity=round(Quantity, digits = 2))%>%
+        ggplot(aes( River,Quantity, col=Parameter))+
+        geom_boxplot() +
+        facet_grid(Parameter~., scales = "free") +
+        theme_void() +
+        scale_color_manual(values = c("#900C3F","#C70039","#FF5733","#FFC30F" )) +
+         theme(axis.title.x = element_text(color="#6C5B7B", size=12, face="bold",margin = margin(t = 20, r = 0, b = 0, l = 0)),
+               axis.title.y = element_text(color="#6C5B7B", size=12, face="bold", angle = 90,margin = margin(t = , r = 0, b = 0, l = 25)),
+               axis.text.y= element_text( color = "black", size = 9, face = "bold"),
+               axis.text.x = element_text( color = "black", size = 9),
+               strip.text.y = element_text(face = "bold", size=9),
+               panel.grid.major.y = element_line('#E6E4E7'),
+               panel.spacing = unit(2, "lines"),
+               legend.position="none")
+```
+
+
+
+```{with location, fig.height=10, fig.width=13, eval=FALSE}
+    data2 %>%
+        select(River, `Sampling Location`, `Sampling Date`, `BOD (mg/l)`, `COD (mg/l`,`MBAS (mg/l)`, `Nitrate (mg/l)`) %>%
+        gather(Parameter, `Quantity`, -(River:`Sampling Date`)) %>%
+        ggplot(aes( River,Quantity, col=`Sampling Location`))+
+        geom_boxplot() +
+        facet_grid(Parameter~., scales = "free") +
+        theme_void() +
+        ggtitle("TItle")+
+        scale_color_manual(values = c("#900C3F","#C70039","#FF5733" ))+
+         theme(axis.title.x = element_text(color="#6C5B7B", size=12, face="bold",margin = margin(t = 20, r = 0, b = 0, l = 0)),
+               axis.title.y = element_text(color="#6C5B7B", size=12, face="bold", angle = 90,margin = margin(t = , r = 0, b = 0, l = 25)),
+               axis.text.y= element_text( color = "black", size = 9, face = "bold"),
+               axis.text.x = element_text( color = "black", size = 9),
+               strip.text.y = element_text(face = "bold", size=9),
+               panel.grid.major.y = element_line('#E6E4E7'),
+               panel.spacing = unit(2, "lines"),
+               legend.position="bottom",
+               legend.text = element_text(colour="black", size = 10, face = "bold"),
+               legend.title =element_text(colour="black", size = 10, face = "bold"))
+
+```
+
+***
+#### Tabulated Results
+
+```{r, results='asis'}
+
+
+  dt3 <- data2 %>%
+        select(-c(Init.Class, Quality, BOD.points:Sulfate.points)) 
+
+
+  kable(dt3, caption = "Original Data") %>%
+  kable_styling(bootstrap_options = "striped", font_size = 10,full_width = F,fixed_thead = T) %>%
+   scroll_box(width = "120%", height = "500px")
+  
+
+```
+
+***
+## Conclusions 
+
+
+During the whole period recorded, the MSW generation rate per day at Escazú city is estimated to be 17 924 kg/day and the yearly per capita solid waste generation rate is estimated to be 95.2 kg/cap/year. The three waste categories that contributed to the greatest proportion of the total waste are traditional waste (73.31%), rubble(17.50%), and garden(6.24%).  
+
+These three waste categories accounted for approximately 97% of the total waste collected, while recyclable material represented only 1.61 %. Besides, on a monthly basis, traditional waste consistently exceeded all the other categories, while the amount of recyclable material collection was rather stable throughout the year.
+
+Taking into account that, it is estimated that 70% of the residues sent to landfills could potentially be a recoverable waste; the information above highlights the challenges in terms of municipal solid waste management in Escazú. This is why the implementation of plans such as PMGIRS is crucial to overcome these shortcomings and improve environmental management in the city.
+
+In this case, with such a small dataset it is impossible to determine or understand the reasons behind the poor separation of residues or the peaks of different waste types during the year. This type of analysis is out of the scope of an exploratory data analysis.  
+
+In terms of surface water quality, in our case there is very little data collected for the oxygen saturation parameter (11 out of 99) which is one of the three parameters required for the initial classification according to Costa Rica's legislation; therefore, in this case, it is insufficient to draw a clear picture of the surface water quality in Escazú. Hence, we classified all parameters into the five categories set by Costa Rican regulation to identify the parameters or rivers where intervention might be needed and those with high scores were analyzed separately. 
+
+Of the rivers where all parameters for the Initial Classification were measured, we can see how independently of the month or sampling site the river was categorized mainly as moderately contaminated.  Based on that, we do not have evidence suggesting any additional spillage such as sewage discharge are affecting those main three parameters throughout the city; however, the samples are very limited and results are not statistically significant. 
+
+However, when looking at all the complementary parameters we can see is not the case for all parameters, for Ammonium in Rio Acres and COD in  Rio Cruz, we did observe higher concentration in the lower part of the river than in the upper sampling points, so efforts to identify the reasons for this results are needed. On the other hand,  BOD, COD, MBAS and Nitrate are the parameters with consistently higher scores, hence, attention need to be directed to identify sources of contamination and improvement opportunities, besides Quebrada Yeguas is the river facing the biggest problems in terms of water quality. 
+
+Looking at all the available measurements, with the data we have, we do not observe time trends in any parameter. Also, it is important to highlight we do not count with measurements at every sampling point (upper, middle, lower) for all the days tested at all rivers. Therefore, observations can be biased.
+
+
+
+
+
+      
+        
+       
